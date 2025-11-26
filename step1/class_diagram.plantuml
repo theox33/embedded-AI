@@ -1,0 +1,109 @@
+@startuml
+' Diagramme de classes pour stai_mpu_object_detection_starting_point.py et ssd_mobilenet_pp.py
+
+package "stai_mpu_object_detection_starting_point" {
+
+    class Application {
+        - exit_app : bool
+        - dcmipp_camera : bool
+        - first_call : bool
+        - window_width : int
+        - window_height : int
+        - frame_width : int
+        - frame_height : int
+        - nn_input_width : int
+        - nn_input_height : int
+        - framerate : int
+        - nn : NeuralNetwork
+        - gst_widget : GstWidget
+        - main_window : MainWindow
+        - overlay_window : OverlayWindow
+        ...
+        + update_ui()
+        + main()
+    }
+
+    class GstWidget {
+        - app : Application
+        - nn : NeuralNetwork
+        ...
+        + camera_dual_pipeline_creation()
+        + new_sample()
+    }
+
+    class MainWindow {
+        - app : Application
+        ...
+    }
+
+    class OverlayWindow {
+        - app : Application
+        ...
+        + drawing()
+    }
+}
+
+package "ssd_mobilenet_pp" {
+
+    class NeuralNetwork {
+        - _model_file : str
+        - _label_file : str
+        - _input_mean : float
+        - _input_std : float
+        - confidence_threshold : float
+        - iou_threshold : float
+        - stai_mpu_model
+        ...
+        + launch_inference(img)
+        + get_results()
+        + postprocess_predictions(...)
+        + get_label(idx, classes)
+    }
+}
+
+Application "1" -- "1" GstWidget : utilise
+Application "1" -- "1" MainWindow : utilise
+Application "1" -- "1" OverlayWindow : utilise
+Application "1" -- "1" NeuralNetwork : utilise
+GstWidget "1" -- "1" NeuralNetwork : utilise
+OverlayWindow "1" -- "1" NeuralNetwork : utilise
+
+
+note top of Application
+__Initialisation de l'application :__
+Classe Application (**_init_**, **main**) et bloc principal (**if _name_ == '_main_'**)
+end note
+
+note right of GstWidget
+__Création du pipeline GStreamer :__
+Méthode **camera_dual_pipeline_creation**
+
+___Capture de la frame caméra pour l'inférence NN :__
+Méthode **new_sample**
+end note
+
+note left of Application
+__Définition de la taille de la frame preview :__
+Attributs **frame_width**, **frame_height**
+
+__Définition de la taille de la frame NN :__
+Attributs **nn_input_width**, **nn_input_height**
+end note
+
+note right of NeuralNetwork
+__Normalisation de la frame :__
+Méthode **launch_inference**
+
+__Exécution de l'inférence NN :__
+Méthode **launch_inference**
+
+__Post-traitement du NN :__
+Méthodes **get_results**, **postprocess_predictions**
+end note
+
+note bottom of OverlayWindow
+__Affichage des résultats sur l'écran :__
+Méthode **drawing**
+end note
+
+@enduml
