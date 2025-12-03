@@ -30,7 +30,8 @@ from os import path
 import cv2
 from PIL import Image
 from timeit import default_timer as timer
-from yolov8_object_detection_pp import NeuralNetwork
+from yolov8_post_process import NeuralNetwork
+
 
 #init gstreamer
 Gst.init(None)
