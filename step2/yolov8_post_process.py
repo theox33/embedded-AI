@@ -112,7 +112,7 @@ class NeuralNetwork:
         - NMS
         Retourne (locations, classes, scores) au format attendu par l'appli.
         """
-        # Sortie unique : 1 x 84 x 1344 (d’après la slide)
+        # Sortie unique : 1 x 84 x 1344
         output = self.stai_mpu_model.get_output(index=0)
         # squeeze -> (84, 1344), transpose -> (1344, 84)
         detections = self.postprocess_yolov8(np.squeeze(output))
