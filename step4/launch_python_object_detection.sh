@@ -15,8 +15,8 @@ echo "stai_mpu wrapper used : "$FRAMEWORK
 CONFIG=$(find /usr/local/x-linux-ai -name "config_board_*.sh")
 source $CONFIG
 
-cmd="/usr/local/x-linux-ai/workspace/step3/stai_mpu_yolov8_object_detection.py \
-    -m /usr/local/x-linux-ai/workspace/models/yolov8n_integer_quant_256_1c_pingpongball_2_fp32_io.nb \
+cmd="/usr/local/x-linux-ai/workspace/step4/stai_mpu_yolov8_object_detection.py \
+    -m /usr/local/x-linux-ai/workspace/models/yolov8n_integer_quant_320_1c_pingpongball_2_fp32_io.nb \
     -l /usr/local/x-linux-ai/workspace/models/labels_pingpong_ball.txt \
     --framerate $DFPS --frame_width $DWIDTH --frame_height $DHEIGHT --camera_src $CAMERA_SRC"
 

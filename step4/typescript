@@ -1,6 +1,6 @@
-Script started on 2000-01-01 04:11:23+00:00 [COMMAND="su -l weston -c '/usr/local/x-linux-ai/workspace/step3/stai_mpu_yolov8_object_detection.py     -m /usr/local/x-linux-ai/workspace/models/yolov8n_integer_quant_256_1c_pingpongball_2_fp32_io.nb     -l /usr/local/x-linux-ai/workspace/models/labels_pingpong_ball.txt     --framerate 30 --frame_width 760 --frame_height 568 --camera_src LIBCAMERA'" TERM="xterm-256color" TTY="/dev/pts/2" COLUMNS="146" LINES="38"]
+Script started on 2025-12-10 00:11:39+00:00 [COMMAND="su -l weston -c '/usr/local/x-linux-ai/workspace/step4/stai_mpu_yolov8_object_detection.py     -m /usr/local/x-linux-ai/workspace/models/yolov8n_integer_quant_320_1c_pingpongball_2_fp32_io.nb     -l /usr/local/x-linux-ai/workspace/models/labels_pingpong_ball.txt     --framerate 30 --frame_width 760 --frame_height 568 --camera_src LIBCAMERA'" TERM="xterm-256color" TTY="/dev/pts/3" COLUMNS="80" LINES="24"]
 display resolution is :  1024  x  600
-NN model used :  /usr/local/x-linux-ai/workspace/models/yolov8n_integer_quant_256_1c_pingpongball_2_fp32_io.nb
+NN model used :  /usr/local/x-linux-ai/workspace/models/yolov8n_integer_quant_320_1c_pingpongball_2_fp32_io.nb
 Loading dynamically: /usr/lib/libstai_mpu_ovx.so.6
 [OVX]: Loading nbg model
 camera preview mode activate
@@ -8,15 +8,11 @@ check if a CSI or USB camera is connected
 /home/weston
 dcmipp found
 Main pipe configuration:  video/x-raw,width=760,height=568,format=RGB16, framerate=30/1
-Aux pipe configuration:   video/x-raw,width=256,height=256,format=RGB, framerate=30/1
-[4:11:17.251378725] [14845] [1;32m INFO [1;37mCamera [1;34mcamera_manager.cpp:313 [0mlibcamera v0.3.0+stm32mp-r7-dirty (2025-06-23T13:56:22+00:00)
-[4:11:17.291255550] [14898] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:259 [0;32m'imx335 0-001a': [0mRecommended V4L2 control 0x009a0922 not supported
-[4:11:17.291782700] [14898] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:331 [0;32m'imx335 0-001a': [0mThe sensor kernel driver needs to be fixed
-[4:11:17.291822375] [14898] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:333 [0;32m'imx335 0-001a': [0mSee Documentation/sensor_driver_requirements.rst in the libcamera sources for more information
-[4:11:17.293930850] [14898] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:479 [0;32m'imx335 0-001a': [0mFailed to retrieve the camera location
-[4:11:17.293999125] [14898] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:501 [0;32m'imx335 0-001a': [0mRotation control not available, default to 0 degrees
-[4:11:17.565018975] [14900] [1;32m INFO [1;37mCamera [1;34mcamera.cpp:1183 [0mconfiguring streams: (0) 760x568-RGB565 (1) 256x256-BGR888
-gtk main finished
-application exited properly
-
-Script done on 2000-01-01 04:30:01+00:00 [COMMAND_EXIT_CODE="0"]
+Aux pipe configuration:   video/x-raw,width=320,height=320,format=RGB, framerate=30/1
+[5:10:27.665119550] [19775] [1;32m INFO [1;37mCamera [1;34mcamera_manager.cpp:313 [0mlibcamera v0.3.0+stm32mp-r7-dirty (2025-06-23T13:56:22+00:00)
+[5:10:27.704470275] [19824] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:259 [0;32m'imx335 0-001a': [0mRecommended V4L2 control 0x009a0922 not supported
+[5:10:27.704713850] [19824] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:331 [0;32m'imx335 0-001a': [0mThe sensor kernel driver needs to be fixed
+[5:10:27.704747900] [19824] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:333 [0;32m'imx335 0-001a': [0mSee Documentation/sensor_driver_requirements.rst in the libcamera sources for more information
+[5:10:27.705907225] [19824] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:479 [0;32m'imx335 0-001a': [0mFailed to retrieve the camera location
+[5:10:27.705941925] [19824] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:501 [0;32m'imx335 0-001a': [0mRotation control not available, default to 0 degrees
+[5:10:27.971501975] [19826] [1;32m INFO [1;37mCamer
