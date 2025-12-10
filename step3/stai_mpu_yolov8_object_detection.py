@@ -439,11 +439,12 @@ class OverlayWindow(Gtk.Window):
 
     def bboxes_colors(self):
         """
-        Create a list of unique color for each labels
+        Create a list of unique colors used to draw boxes
         """
         bbcolor_list = []
-        labels = self.app.nn.get_labels()
-        for i in range(len(labels)):
+        # generate a palette (independent from label count) to give each box a color
+        palette_size = 32
+        for _ in range(palette_size):
             bbcolor = (random.random(), random.random(), random.random())
             bbcolor_list.append(bbcolor)
         return bbcolor_list
@@ -627,12 +628,12 @@ class OverlayWindow(Gtk.Window):
                     y1 = int(self.app.nn_result_locations[0][i][3] * preview_height)
                     x1 = int(self.app.nn_result_locations[0][i][2] * preview_width)
                     accuracy = self.app.nn_result_scores[0][i] * 100
-                    color_idx = int(self.app.nn_result_classes[0][i])
+                    # choose color per detection index to ensure different boxes have different colors even with 1 label
+                    color_idx = i % len(self.bbcolor_list)
                     x = x0 + offset
                     y = y0 + vertical_offset
                     width = (x1 - x0)
                     height = (y1 - y0)
-                    label = self.app.nn.get_label(i,self.app.nn_result_classes)
                     cr.set_source_rgb(self.bbcolor_list[color_idx][0],self.bbcolor_list[color_idx][1],self.bbcolor_list[color_idx][2])
                     cr.rectangle(int(x),int(y),width,height)
                     cr.stroke()
@@ -646,12 +647,11 @@ class OverlayWindow(Gtk.Window):
                     y1 = int(self.app.nn_result_locations[0][i][2] * preview_height)
                     x1 = int(self.app.nn_result_locations[0][i][3] * preview_width)
                     accuracy = self.app.nn_result_scores[0][i] * 100
-                    color_idx = int(self.app.nn_result_classes[0][i])
+                    color_idx = i % len(self.bbcolor_list)
                     x = x0 + offset
                     y = y0 + vertical_offset
                     width = (x1 - x0)
                     height = (y1 - y0)
-                    label = self.app.nn.get_label(i,self.app.nn_result_classes)
                     cr.set_source_rgb(self.bbcolor_list[color_idx][0],self.bbcolor_list[color_idx][1],self.bbcolor_list[color_idx][2])
                     cr.rectangle(int(x),int(y),width,height)
                     cr.stroke()

@@ -112,9 +112,8 @@ class NeuralNetwork:
         - NMS
         Retourne (locations, classes, scores) au format attendu par l'appli.
         """
-        # Sortie unique : 1 x 84 x 1344
+        # Sortie unique : 1 x C+4 x N (ex: 1 x 84 x 1344 ou 1 x 5 x N pour 1 classe)
         output = self.stai_mpu_model.get_output(index=0)
-        # squeeze -> (84, 1344), transpose -> (1344, 84)
         detections = self.postprocess_yolov8(np.squeeze(output))
 
         if len(detections) == 0:
@@ -137,19 +136,20 @@ class NeuralNetwork:
 
     def postprocess_yolov8(self, outputs):
         """
-        outputs: (84, 1344) -> transpose to (1344, 84)
+        outputs: (C+4, N) -> transpose to (N, C+4)
         Chaque détection:
           [0..3] : x_center, y_center, w, h   (normalisés 0..1)
-          [4..]  : scores par classe
+          [4..]  : scores par classe (longueur variable selon le modèle)
         """
-        output_data = np.transpose(outputs)  # (1344, 84)
+        output_data = np.transpose(outputs)  # (N, C+4)
         candidates = []
 
         for det in output_data:
             x_c, y_c, w, h = det[:4]
 
-            # scores de classes (4..)
             class_scores = det[4:]
+            if class_scores.size == 0:
+                continue
             best_class = int(np.argmax(class_scores))
             best_score = float(class_scores[best_class])
 
@@ -165,9 +165,7 @@ class NeuralNetwork:
             # on stocke [x0, y0, x1, y1, score, class_id]
             candidates.append([x0, y0, x1, y1, best_score, best_class])
 
-        # NMS
         final_dets = self.non_max_suppression(candidates, self.iou_threshold)
-        # On renvoie sous la forme [ [box, cls_id, score], ... ]
         results = []
         for det in final_dets:
             x0, y0, x1, y1, score, cls_id = det
