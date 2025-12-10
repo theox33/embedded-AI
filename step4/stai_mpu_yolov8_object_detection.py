@@ -30,6 +30,7 @@ from os import path
 import cv2
 from PIL import Image
 from timeit import default_timer as timer
+import supervision as sv
 from yolov8_post_process import NeuralNetwork
 
 
@@ -272,6 +273,7 @@ class GstWidget(Gtk.Box):
             self.app.nn_inference_time = self.nn.launch_inference(arr)
             self.app.nn_inference_fps = (1000/(self.app.nn_inference_time*1000))
             self.app.nn_result_locations, self.app.nn_result_classes, self.app.nn_result_scores  = self.nn.get_results()
+            self.app.apply_tracking()
             struc = Gst.Structure.new_empty("inference-done")
             msg = Gst.Message.new_application(None, struc)
             if (args.camera_src =="LIBCAMERA"):
@@ -617,47 +619,47 @@ class OverlayWindow(Gtk.Window):
 
             cr.set_line_width(4)
             cr.set_font_size(self.ui_cairo_font_size)
-            # Outputs are not in same order for ssd_mobilenet v1 and v2, outputs are already filtered by score in
-            # ssd_mobilenet_v2 which is not the case for v1
-            for i in range(np.array(self.app.nn_result_scores).size):
-                label = self.app.nn.get_label(i,self.app.nn_result_classes)
-                if self.app.nn.model_type == "ssd_mobilenet_v2":
-                    # Scale NN outputs for the display before drawing
-                    y0 = int(self.app.nn_result_locations[0][i][1] * preview_height)
-                    x0 = int(self.app.nn_result_locations[0][i][0] * preview_width)
-                    y1 = int(self.app.nn_result_locations[0][i][3] * preview_height)
-                    x1 = int(self.app.nn_result_locations[0][i][2] * preview_width)
-                    accuracy = self.app.nn_result_scores[0][i] * 100
-                    # choose color per detection index to ensure different boxes have different colors even with 1 label
-                    color_idx = i % len(self.bbcolor_list)
-                    x = x0 + offset
-                    y = y0 + vertical_offset
-                    width = (x1 - x0)
-                    height = (y1 - y0)
-                    cr.set_source_rgb(self.bbcolor_list[color_idx][0],self.bbcolor_list[color_idx][1],self.bbcolor_list[color_idx][2])
-                    cr.rectangle(int(x),int(y),width,height)
+            x_scale = preview_width / float(self.app.frame_width)
+            y_scale = preview_height / float(self.app.frame_height)
+
+            # Draw tracked boxes with stable color per track id and show short trajectory from centroid history
+            for i in range(len(self.app.tracked_boxes)):
+                label_id = int(self.app.tracked_classes[i]) if len(self.app.tracked_classes) > i else 0
+                track_id = int(self.app.tracked_ids[i]) if len(self.app.tracked_ids) > i else i
+                label = self.app.nn.get_labels()[label_id]
+
+                x0 = int(self.app.tracked_boxes[i][0] * x_scale)
+                y0 = int(self.app.tracked_boxes[i][1] * y_scale)
+                x1 = int(self.app.tracked_boxes[i][2] * x_scale)
+                y1 = int(self.app.tracked_boxes[i][3] * y_scale)
+                accuracy = float(self.app.tracked_scores[i]) * 100 if len(self.app.tracked_scores) > i else 0
+
+                color_idx = track_id % len(self.bbcolor_list)
+                x = x0 + offset
+                y = y0 + vertical_offset
+                width = (x1 - x0)
+                height = (y1 - y0)
+
+                cr.set_source_rgb(self.bbcolor_list[color_idx][0], self.bbcolor_list[color_idx][1], self.bbcolor_list[color_idx][2])
+                cr.rectangle(int(x), int(y), width, height)
+                cr.stroke()
+
+                cr.move_to(x, (y - (self.ui_cairo_font_size / 2)))
+                text_to_display = f"{label} #{track_id} {int(accuracy)}%"
+                cr.show_text(text_to_display)
+
+                # Draw short trajectory
+                history = self.app.track_history.get(track_id, [])
+                if len(history) >= 2:
+                    cr.set_source_rgb(self.bbcolor_list[color_idx][0], self.bbcolor_list[color_idx][1], self.bbcolor_list[color_idx][2])
+                    for p_idx in range(1, len(history)):
+                        x_prev = int(history[p_idx - 1][0] * x_scale + offset)
+                        y_prev = int(history[p_idx - 1][1] * y_scale + vertical_offset)
+                        x_curr = int(history[p_idx][0] * x_scale + offset)
+                        y_curr = int(history[p_idx][1] * y_scale + vertical_offset)
+                        cr.move_to(x_prev, y_prev)
+                        cr.line_to(x_curr, y_curr)
                     cr.stroke()
-                    cr.move_to(x , (y - (self.ui_cairo_font_size/2)))
-                    text_to_display = label + " " + str(int(accuracy)) + "%"
-                    cr.show_text(text_to_display)
-                elif (self.app.nn.model_type == "ssd_mobilenet_v1" and self.app.nn_result_scores[0][i] > args.conf_threshold ):
-                    # Scale NN outputs for the display before drawing
-                    y0 = int(self.app.nn_result_locations[0][i][0] * preview_height)
-                    x0 = int(self.app.nn_result_locations[0][i][1] * preview_width)
-                    y1 = int(self.app.nn_result_locations[0][i][2] * preview_height)
-                    x1 = int(self.app.nn_result_locations[0][i][3] * preview_width)
-                    accuracy = self.app.nn_result_scores[0][i] * 100
-                    color_idx = i % len(self.bbcolor_list)
-                    x = x0 + offset
-                    y = y0 + vertical_offset
-                    width = (x1 - x0)
-                    height = (y1 - y0)
-                    cr.set_source_rgb(self.bbcolor_list[color_idx][0],self.bbcolor_list[color_idx][1],self.bbcolor_list[color_idx][2])
-                    cr.rectangle(int(x),int(y),width,height)
-                    cr.stroke()
-                    cr.move_to(x , (y - (self.ui_cairo_font_size/2)))
-                    text_to_display = label + " " + str(int(accuracy)) + "%"
-                    cr.show_text(text_to_display)
         return True
 
 class Application:
@@ -677,6 +679,11 @@ class Application:
         self.nn_result_scores=[]
         self.nn_result_classes=[]
         self.predictions = []
+        self.tracked_boxes = np.empty((0, 4))
+        self.tracked_scores = np.array([])
+        self.tracked_classes = np.array([])
+        self.tracked_ids = np.array([])
+        self.track_history = {}
 
         #preview dimensions and fps
         self.frame_width = args.frame_width
@@ -693,6 +700,9 @@ class Application:
         self.nn_inference_fps = 0.0
         self.nn_result_label = 0
         self.label_to_display = ""
+
+        # ByteTrack tracker (no args here for compatibility) to assign stable IDs and feed short trails
+        self.byte_tracker = sv.ByteTrack()
 
         print("camera preview mode activate")
         self.enable_camera_preview = True
@@ -771,6 +781,61 @@ class Application:
             if "AUX_POSTPROC" in i:
                 aux_postproc = i.lstrip('AUX_POSTPROC=')
         return video_device_prev, camera_caps_prev, dcmipp_sensor, main_postproc
+
+    def apply_tracking(self):
+        """
+        Run ByteTrack on current detections and keep a short centroid history.
+        """
+        if len(self.nn_result_locations) == 0 or np.array(self.nn_result_locations).size == 0:
+            self.tracked_boxes = np.empty((0, 4))
+            self.tracked_scores = np.array([])
+            self.tracked_classes = np.array([])
+            self.tracked_ids = np.array([])
+            self.track_history = {}
+            return
+
+        # Ensure detections are numeric (some runtimes return strings)
+        boxes_norm = np.array(self.nn_result_locations[0], dtype=np.float32)
+        if boxes_norm.ndim != 2 or boxes_norm.shape[1] < 4:
+            self.tracked_boxes = np.empty((0, 4))
+            self.tracked_scores = np.array([])
+            self.tracked_classes = np.array([])
+            self.tracked_ids = np.array([])
+            self.track_history = {}
+            return
+
+        # Convert normalized boxes to absolute pixel coordinates
+        scale = np.array([self.frame_width, self.frame_height, self.frame_width, self.frame_height], dtype=np.float32)
+        boxes = boxes_norm[:, :4] * scale
+
+        # Create Supervision Detections object
+        detections = sv.Detections(
+            xyxy=np.array(boxes, dtype=np.float32),
+            confidence=np.array(self.nn_result_scores[0], dtype=np.float32),
+            class_id=np.array(self.nn_result_classes[0], dtype=int)
+        )
+
+        # Update tracker -> stable IDs and filtered tracks
+        tracked = self.byte_tracker.update_with_detections(detections)
+        self.tracked_boxes = tracked.xyxy
+        self.tracked_scores = tracked.confidence
+        self.tracked_classes = tracked.class_id
+        self.tracked_ids = tracked.tracker_id
+        # Labels style supervision example ("#id") if needed elsewhere
+        track_labels = [f"#{tid}" for tid in tracked.tracker_id]
+
+        new_history = {}
+        # Build short centroid history (30 pts max) per track for drawing trails
+        for box, track_id in zip(tracked.xyxy, tracked.tracker_id):
+            tid = int(track_id)
+            cx = float((box[0] + box[2]) / 2.0)
+            cy = float((box[1] + box[3]) / 2.0)
+            history = self.track_history.get(tid, [])
+            history.append((cx, cy))
+            if len(history) > 30:
+                history = history[-30:]
+            new_history[tid] = history
+        self.track_history = new_history
 
     # Updating the labels and the inference infos displayed on the GUI interface - camera input
     def update_label_preview(self):
