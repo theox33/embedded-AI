@@ -21,7 +21,6 @@ import argparse
 import signal
 import os
 import random
-from collections import deque
 import time
 import json
 import subprocess
@@ -273,7 +272,6 @@ class GstWidget(Gtk.Box):
             self.app.nn_inference_time = self.nn.launch_inference(arr)
             self.app.nn_inference_fps = (1000/(self.app.nn_inference_time*1000))
             self.app.nn_result_locations, self.app.nn_result_classes, self.app.nn_result_scores  = self.nn.get_results()
-            self.app.update_tracks(self.app.nn_result_locations, self.app.nn_result_scores, self.app.nn_result_classes)
             struc = Gst.Structure.new_empty("inference-done")
             msg = Gst.Message.new_application(None, struc)
             if (args.camera_src =="LIBCAMERA"):
@@ -619,45 +617,47 @@ class OverlayWindow(Gtk.Window):
 
             cr.set_line_width(4)
             cr.set_font_size(self.ui_cairo_font_size)
-            tracks_items = list(self.app.tracks.items())
-            for tid, track in tracks_items:
-                x0, y0, x1, y1 = track.get("bbox", (0, 0, 0, 0))
-                label = self.app.nn.get_labels()[track.get("class", 0)]
-                accuracy = track.get("score", 0.0) * 100
-                color = track.get("color") or self.bbcolor_list[tid % len(self.bbcolor_list)]
-
-                y0p = int(y0 * preview_height)
-                x0p = int(x0 * preview_width)
-                y1p = int(y1 * preview_height)
-                x1p = int(x1 * preview_width)
-
-                x = x0p + offset
-                y = y0p + vertical_offset
-                width = (x1p - x0p)
-                height = (y1p - y0p)
-
-                cr.set_source_rgb(color[0], color[1], color[2])
-                cr.rectangle(int(x), int(y), width, height)
-                cr.stroke()
-                cr.move_to(x, (y - (self.ui_cairo_font_size / 2)))
-                text_to_display = "ID {} {} {}%".format(tid, label, int(accuracy))
-                cr.show_text(text_to_display)
-
-                history = list(track.get("history", []))
-                if len(history) > 1:
-                    cr.set_source_rgba(color[0], color[1], color[2], 0.7)
-                    cr.set_line_width(2)
-                    first = True
-                    for hx, hy in history:
-                        px = hx * preview_width + offset
-                        py = hy * preview_height + vertical_offset
-                        if first:
-                            cr.move_to(px, py)
-                            first = False
-                        else:
-                            cr.line_to(px, py)
+            # Outputs are not in same order for ssd_mobilenet v1 and v2, outputs are already filtered by score in
+            # ssd_mobilenet_v2 which is not the case for v1
+            for i in range(np.array(self.app.nn_result_scores).size):
+                label = self.app.nn.get_label(i,self.app.nn_result_classes)
+                if self.app.nn.model_type == "ssd_mobilenet_v2":
+                    # Scale NN outputs for the display before drawing
+                    y0 = int(self.app.nn_result_locations[0][i][1] * preview_height)
+                    x0 = int(self.app.nn_result_locations[0][i][0] * preview_width)
+                    y1 = int(self.app.nn_result_locations[0][i][3] * preview_height)
+                    x1 = int(self.app.nn_result_locations[0][i][2] * preview_width)
+                    accuracy = self.app.nn_result_scores[0][i] * 100
+                    # choose color per detection index to ensure different boxes have different colors even with 1 label
+                    color_idx = i % len(self.bbcolor_list)
+                    x = x0 + offset
+                    y = y0 + vertical_offset
+                    width = (x1 - x0)
+                    height = (y1 - y0)
+                    cr.set_source_rgb(self.bbcolor_list[color_idx][0],self.bbcolor_list[color_idx][1],self.bbcolor_list[color_idx][2])
+                    cr.rectangle(int(x),int(y),width,height)
                     cr.stroke()
-                    cr.set_line_width(4)
+                    cr.move_to(x , (y - (self.ui_cairo_font_size/2)))
+                    text_to_display = label + " " + str(int(accuracy)) + "%"
+                    cr.show_text(text_to_display)
+                elif (self.app.nn.model_type == "ssd_mobilenet_v1" and self.app.nn_result_scores[0][i] > args.conf_threshold ):
+                    # Scale NN outputs for the display before drawing
+                    y0 = int(self.app.nn_result_locations[0][i][0] * preview_height)
+                    x0 = int(self.app.nn_result_locations[0][i][1] * preview_width)
+                    y1 = int(self.app.nn_result_locations[0][i][2] * preview_height)
+                    x1 = int(self.app.nn_result_locations[0][i][3] * preview_width)
+                    accuracy = self.app.nn_result_scores[0][i] * 100
+                    color_idx = i % len(self.bbcolor_list)
+                    x = x0 + offset
+                    y = y0 + vertical_offset
+                    width = (x1 - x0)
+                    height = (y1 - y0)
+                    cr.set_source_rgb(self.bbcolor_list[color_idx][0],self.bbcolor_list[color_idx][1],self.bbcolor_list[color_idx][2])
+                    cr.rectangle(int(x),int(y),width,height)
+                    cr.stroke()
+                    cr.move_to(x , (y - (self.ui_cairo_font_size/2)))
+                    text_to_display = label + " " + str(int(accuracy)) + "%"
+                    cr.show_text(text_to_display)
         return True
 
 class Application:
@@ -677,12 +677,6 @@ class Application:
         self.nn_result_scores=[]
         self.nn_result_classes=[]
         self.predictions = []
-        # simple tracker state
-        self.tracks = {}
-        self.track_id_counter = 0
-        self.max_history = 30
-        self.max_age = 10
-        self.match_thresh = 0.12  # distance threshold on normalized coords
 
         #preview dimensions and fps
         self.frame_width = args.frame_width
@@ -799,90 +793,6 @@ class Application:
 
         self.label_to_display = label
         return True
-
-    def update_tracks(self, locations, scores, classes):
-        """Update simple centroid tracker with new detections."""
-        # Expect locations shape (1, N, 4) normalized
-        if locations is None or len(locations) == 0:
-            # age existing tracks
-            to_del = []
-            for tid, t in self.tracks.items():
-                t["age"] += 1
-                if t["age"] > self.max_age:
-                    to_del.append(tid)
-            for tid in to_del:
-                self.tracks.pop(tid, None)
-            return
-
-        locs = locations[0]
-        scs = scores[0] if len(scores) > 0 else []
-        cls = classes[0] if len(classes) > 0 else []
-
-        # prepare track matching by nearest center
-        unmatched_tracks = set(self.tracks.keys())
-        detections_data = []
-        for i, bb in enumerate(locs):
-            x0, y0, x1, y1 = bb
-            cx = 0.5 * (x0 + x1)
-            cy = 0.5 * (y0 + y1)
-            score = scs[i] if len(scs) > i else 0.0
-            cid = cls[i] if len(cls) > i else 0
-            detections_data.append((i, (x0, y0, x1, y1), cx, cy, float(score), int(cid)))
-
-        # greedy assign detections to nearest track within threshold
-        assignments = []  # (det_idx, track_id)
-        for det_idx, bb, cx, cy, sc, cid in detections_data:
-            best_tid = None
-            best_dist = 1e9
-            for tid in list(unmatched_tracks):
-                t = self.tracks[tid]
-                tcx, tcy = t["center"]
-                dist = ((cx - tcx) ** 2 + (cy - tcy) ** 2) ** 0.5
-                if dist < best_dist and dist < self.match_thresh:
-                    best_dist = dist
-                    best_tid = tid
-            if best_tid is not None:
-                assignments.append((det_idx, best_tid))
-                unmatched_tracks.discard(best_tid)
-
-        # update matched tracks
-        for det_idx, tid in assignments:
-            _, bb, cx, cy, sc, cid = detections_data[det_idx]
-            t = self.tracks[tid]
-            t["bbox"] = bb
-            t["center"] = (cx, cy)
-            t["score"] = sc
-            t["class"] = cid
-            t["age"] = 0
-            t["history"].append((cx, cy))
-
-        # remove stale unmatched tracks
-        to_del = []
-        for tid in unmatched_tracks:
-            self.tracks[tid]["age"] += 1
-            if self.tracks[tid]["age"] > self.max_age:
-                to_del.append(tid)
-        for tid in to_del:
-            self.tracks.pop(tid, None)
-
-        # add new tracks for unassigned detections
-        assigned_det = {a[0] for a in assignments}
-        for det_idx, bb, cx, cy, sc, cid in detections_data:
-            if det_idx in assigned_det:
-                continue
-            tid = self.track_id_counter
-            self.track_id_counter += 1
-            color = (random.random(), random.random(), random.random())
-            self.tracks[tid] = {
-                "bbox": bb,
-                "center": (cx, cy),
-                "score": sc,
-                "class": cid,
-                "age": 0,
-                "history": deque(maxlen=self.max_history),
-                "color": color,
-            }
-            self.tracks[tid]["history"].append((cx, cy))
 
     def update_ui(self):
         """
