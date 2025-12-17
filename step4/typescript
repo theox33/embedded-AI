@@ -15,4 +15,8 @@ Aux pipe configuration:   video/x-raw,width=256,height=256,format=RGB, framerate
 [3:19:00.156885150] [12250] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:333 [0;32m'imx335 0-001a': [0mSee Documentation/sensor_driver_requirements.rst in the libcamera sources for more information
 [3:19:00.158086800] [12250] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:479 [0;32m'imx335 0-001a': [0mFailed to retrieve the camera location
 [3:19:00.158180725] [12250] [1;33m WARN [1;37mCameraSensor [1;34mcamera_sensor.cpp:501 [0;32m'imx335 0-001a': [0mRotation control not available, default to 0 degrees
-[3:19:00.390262850] [12252] [1;32m INFO [1;37mCamera [1;3
+[3:19:00.390262850] [12252] [1;32m INFO [1;37mCamera [1;34mcamera.cpp:1183 [0mconfiguring streams: (0) 760x568-RGB565 (1) 256x256-BGR888
+gtk main finished
+application exited properly
+
+Script done on 2000-01-01 08:18:03+00:00 [COMMAND_EXIT_CODE="0"]

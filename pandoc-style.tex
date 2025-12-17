@@ -1,0 +1,18 @@
+% Style LaTeX Pandoc personnalisé pour un rendu épuré
+\usepackage{geometry}
+\geometry{margin=1.5cm}
+\usepackage{setspace}
+\setstretch{1.25} % Interligne général
+\usepackage{titlesec}
+% Espacement avant/après titres
+\titlespacing*{\section}{0pt}{1.5em}{0.8em}
+\titlespacing*{\subsection}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsubsection}{0pt}{1em}{0.5em}
+% Style titres
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection}{1em}{\hspace{0.5em}}[\vspace{0.5em}]
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{1em}{\hspace{0.5em}}[\vspace{0.3em}]
+\titleformat{\subsubsection}{\normalfont\normalsize\bfseries}{\thesubsubsection}{1em}{\hspace{0.5em}}[\vspace{0.2em}]
+% Tabulations accentuées
+\setlength{\parindent}{2em}
+% Espacement entre paragraphes
+\setlength{\parskip}{0.7em}
