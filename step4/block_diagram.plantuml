@@ -20,14 +20,24 @@ frame "GStreamer pipeline (capture + fan-out)" {
   [capsfilter\nRGB NN_WxNN_H @ fps] as caps_nn
   [appsink\n(sync=false, max=1, drop=true)] as appsink
 
+  note right of cam
+    Source vidéo de la caméra, fournit des images en format RGB16 et résolution WxH.
+  end note
+
   note right of queue_preview
-    La branche preview ne garde que la dernière image (leaky=downstream)
-    pour privilégier la fluidité d'affichage à la latence.
+    Branche preview :
+    - videorate ajuste le framerate pour l'affichage
+    - queue (leaky) ne garde que la dernière image pour éviter la latence
+    - capsfilter force le format et la fréquence d'images
+    - fpsdisplaysink/gtkwaylandsink affiche le flux vidéo en temps réel
   end note
 
   note right of queue_nn
-    La branche NN élimine aussi les anciennes images
-    pour garantir l'inférence en temps réel.
+    Branche NN (Neural Network) :
+    - videorate0 ajuste le framerate pour l'inférence
+    - queue0 (leaky) ne garde que la dernière image pour garantir l'inférence en temps réel
+    - capsfilter adapte la taille d'image à celle attendue par le modèle
+    - appsink permet de récupérer les images dans le code Python pour traitement IA
   end note
 
   cam --> vrate_preview
@@ -47,14 +57,23 @@ package "Perception pipeline" {
   [Neural inference\n(TFLite runner on YOLOv8n quant)] as inference
   [Postprocessing\n(YOLOv8 decode: transpose, best cls, thresholds, NMS -> boxes/conf/classes)] as postproc
 
+  note right of acquisition
+    Récupère les images depuis appsink pour les traiter en Python.
+  end note
+
   note right of preprocessing
-    Aligne le buffer sur l'entrée du modèle : gère stride/décalage,
-    minimise le coût CPU (vue, copies minimales).
+    Convertit le buffer en tableau NumPy, gère le stride (décalage mémoire),
+    convertit en RGB uint8, format attendu par le modèle.
+  end note
+
+  note right of inference
+    Exécute le modèle YOLOv8n quantifié (TFLite) pour détecter les objets.
   end note
 
   note right of postproc
-    Filtre par confiance/IoU, convertit centre→coins, applique NMS,
-    produit boîtes en pixels, scores et identifiants de classe.
+    Décode la sortie du modèle : transpose, sélectionne la meilleure classe,
+    applique des seuils de confiance et NMS (suppression des doublons),
+    produit les boîtes, scores et classes.
   end note
 }
 
@@ -64,12 +83,18 @@ package "Tracking + semantics" {
   [Recognition & understanding\n(label mapping 1 class: pingpong_ball)] as recognition
 
   note right of tracking
-    ByteTrack attribue des IDs stables et supprime les pistes de faible qualité
-    pour réduire le clignotement d'une frame à l'autre.
+    Met à jour les pistes d'objets détectés, attribue des IDs stables,
+    supprime les pistes peu fiables pour éviter le clignotement.
   end note
 
   note right of history
-    Garde les 30 derniers centroïdes par piste pour dessiner les trajectoires courtes.
+    Garde en mémoire les 30 derniers centroïdes de chaque piste
+    pour dessiner la trajectoire de chaque objet.
+  end note
+
+  note right of recognition
+    Fait le mapping du label (ici, une seule classe : pingpong_ball)
+    pour l'affichage.
   end note
 }
 
@@ -78,8 +103,14 @@ package "UI & display" {
   [Display\n(overlay window + preview)] as display_out
 
   note right of overlay
-    Réutilise track_id pour choisir une couleur stable, affiche label/#id/conf,
-    et trace les trajectoires à partir de l'historique des centroïdes.
+    Utilise GTK Cairo pour dessiner sur l'image :
+    - Boîte colorée selon le track_id (ID de suivi)
+    - Texte avec label, numéro d'ID et confiance
+    - Trajectoire de l'objet à partir de l'historique des centroïdes
+  end note
+
+  note right of display_out
+    Affiche la fenêtre d'overlay fusionnée avec la preview vidéo.
   end note
 }
 
