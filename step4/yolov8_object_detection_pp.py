@@ -200,7 +200,7 @@ class NeuralNetwork:
                                 predicted_boxes,
                                 predicted_anchors,
                                 nms_thresh: float = 0.45,
-                                confidence_thresh: float = 0.70):
+                                confidence_thresh: float = 0.40):
         """
         Postprocesses the predictions to filter out weak and overlapping bounding boxes.
         """

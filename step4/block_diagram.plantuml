@@ -1,0 +1,107 @@
+@startuml
+top to bottom direction
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+' Step 4: YOLOv8 pingpong + ByteTrack tracking
+' High-level block diagram with GStreamer pipeline and processing steps
+
+title Step 4 - YOLOv8 + ByteTrack (Block Diagram)
+
+frame "GStreamer pipeline (capture + fan-out)" {
+  [libcamerasrc\n(RGB16 WxH)] as cam
+  [videorate\n(preview path)] as vrate_preview
+  [queue\n(leaky=downstream, max=1)] as queue_preview
+  [capsfilter\nRGB16 WxH @ fps] as caps_preview
+  [fpsdisplaysink -> gtkwaylandsink\n(display preview)] as display
+
+  [videorate0\n(NN path)] as vrate_nn
+  [queue0\n(leaky=downstream, max=1)] as queue_nn
+  [capsfilter\nRGB NN_WxNN_H @ fps] as caps_nn
+  [appsink\n(sync=false, max=1, drop=true)] as appsink
+
+  note right of queue_preview
+    La branche preview ne garde que la dernière image (leaky=downstream)
+    pour privilégier la fluidité d'affichage à la latence.
+  end note
+
+  note right of queue_nn
+    La branche NN élimine aussi les anciennes images
+    pour garantir l'inférence en temps réel.
+  end note
+
+  cam --> vrate_preview
+  vrate_preview --> queue_preview
+  queue_preview --> caps_preview
+  caps_preview --> display
+
+  cam --> vrate_nn
+  vrate_nn --> queue_nn
+  queue_nn --> caps_nn
+  caps_nn --> appsink
+}
+
+package "Perception pipeline" {
+  [Data acquisition\n(GStreamer appsink -> buffer)] as acquisition
+  [Preprocessing\n(NumPy view, stride handling, to RGB uint8)] as preprocessing
+  [Neural inference\n(TFLite runner on YOLOv8n quant)] as inference
+  [Postprocessing\n(YOLOv8 decode: transpose, best cls, thresholds, NMS -> boxes/conf/classes)] as postproc
+
+  note right of preprocessing
+    Aligne le buffer sur l'entrée du modèle : gère stride/décalage,
+    minimise le coût CPU (vue, copies minimales).
+  end note
+
+  note right of postproc
+    Filtre par confiance/IoU, convertit centre→coins, applique NMS,
+    produit boîtes en pixels, scores et identifiants de classe.
+  end note
+}
+
+package "Tracking + semantics" {
+  [Tracking\n(ByteTrack update + filtered tracks)] as tracking
+  [Centroid history\n(per track, <=30 points)] as history
+  [Recognition & understanding\n(label mapping 1 class: pingpong_ball)] as recognition
+
+  note right of tracking
+    ByteTrack attribue des IDs stables et supprime les pistes de faible qualité
+    pour réduire le clignotement d'une frame à l'autre.
+  end note
+
+  note right of history
+    Garde les 30 derniers centroïdes par piste pour dessiner les trajectoires courtes.
+  end note
+}
+
+package "UI & display" {
+  [Decision & overlay\n(GTK Cairo: box color by track_id, text label/#id/conf, trails)] as overlay
+  [Display\n(overlay window + preview)] as display_out
+
+  note right of overlay
+    Réutilise track_id pour choisir une couleur stable, affiche label/#id/conf,
+    et trace les trajectoires à partir de l'historique des centroïdes.
+  end note
+}
+
+appsink --> acquisition
+acquisition --> preprocessing
+preprocessing --> inference
+inference --> postproc
+postproc --> tracking
+tracking --> history
+tracking --> recognition
+history --> overlay
+recognition --> overlay
+postproc --> overlay
+overlay --> display_out
+
+legend left
+  # Capture: libcamerasrc fan-out -> preview & NN paths.
+  # Preprocess: buffer to RGB uint8 with stride handling.
+  # Inference: TFLite YOLOv8n quantized model.
+  # Postprocess: decode, thresholds, NMS -> boxes/conf/classes.
+  # Tracking: ByteTrack assigns stable IDs, keeps centroid history (<=30 pts).
+  # Overlay: GTK Cairo draws box per track_id color, label/#id/conf, and trails.
+endlegend
+
+@enduml

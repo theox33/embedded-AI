@@ -830,9 +830,9 @@ class Application:
             tid = int(track_id)
             cx = float((box[0] + box[2]) / 2.0)
             cy = float((box[1] + box[3]) / 2.0)
-            history = self.track_history.get(tid, [])
-            history.append((cx, cy))
-            if len(history) > 30:
+            history = self.track_history.get(tid, [])   # get previous history
+            history.append((cx, cy))    # add current centroid
+            if len(history) > 30:   # keep only last 30 points
                 history = history[-30:]
             new_history[tid] = history
         self.track_history = new_history
